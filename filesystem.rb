@@ -53,7 +53,7 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'file rw'
-      results = Benchmark.bm(24) do |x|
+      results = Benchmark.bm(32) do |x|
         x.report('w 1g') do
           write_file(File.join(dest,'tmp.1G'), 1024 * 1024)
         end
@@ -92,7 +92,7 @@ class FilesystemBenchmark
       puts ''
       puts 'dir'
       n = 1024 * 100
-      Benchmark.bm(24) do |x|
+      Benchmark.bm(32) do |x|
         x.report("create #{n} dirs") do
           (1..n).to_a.shuffle.each do |i|
             FileUtils.makedirs(File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/')))
@@ -111,7 +111,7 @@ class FilesystemBenchmark
       puts 'mix'
       file_count = 1024 * 10
       read_count = 5
-      Benchmark.bm(24) do |x|
+      Benchmark.bm(32) do |x|
         dirs = (1..file_count).to_a
         read_count.times {dirs += (1..file_count).to_a}
 
