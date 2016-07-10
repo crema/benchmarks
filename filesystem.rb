@@ -4,8 +4,10 @@ require 'benchmark'
 require 'filesize'
 
 class FilesystemBenchmark
-  def initialize(dest)
+  def initialize(dest, count, read)
     @dest = dest
+    @count = count
+    @read = read
   end
 
   def benchmark
@@ -17,7 +19,7 @@ class FilesystemBenchmark
 
   private
 
-  attr_reader :dest
+  attr_reader :dest, :count, :read
 
   def with_dest_dir
     FileUtils.makedirs(dest)
@@ -61,17 +63,17 @@ class FilesystemBenchmark
       results = Benchmark.bm(32) do |x|
         clear_cache
         x.report('w 1g') do
-          write_file(File.join(dest,'tmp.1G'), 1024 * 1024)
+          write_file(File.join(dest,'tmp.1G'), 1024 * count)
         end
         clear_cache
         x.report('w 1M * 1024') do
-          for i in (0..1024) do
+          for i in (0..count) do
             write_file(File.join(dest,"tmp.1M.#{i}"), 1024)
           end
         end
         clear_cache
         x.report('w 100K * 10240') do
-          for i in (0..10240) do
+          for i in (0..(count*10)) do
             write_file(File.join(dest,"tmp.100K.#{i}"), 100)
           end
         end
@@ -81,12 +83,12 @@ class FilesystemBenchmark
         end
         clear_cache
         x.report('r 1M * 1024') do
-          for i in (0..1024) do
+          for i in (0..count) do
             read_file(File.join(dest,"tmp.1M.#{i}"))
           end
         end
         x.report('r 100k * 10240') do
-          for i in (0..10240) do
+          for i in (0..(count*10)) do
             read_file(File.join(dest,"tmp.100k.#{i}"))
           end
         end
@@ -98,11 +100,10 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'dir'
-      n = 1024
       Benchmark.bm(32) do |x|
         clear_cache
         x.report("create #{n} dirs") do
-          (1..n).to_a.shuffle.each do |i|
+          (1..count).to_a.shuffle.each do |i|
             FileUtils.makedirs(File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/')))
           end
         end
@@ -118,13 +119,11 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'mix'
-      file_count = 1024
-      read_count = 5
       Benchmark.bm(32) do |x|
-        dirs = (1..file_count).to_a
-        read_count.times {dirs += (1..file_count).to_a}
+        dirs = (1..count).to_a
+        read.times {dirs += (1..count).to_a}
         clear_cache
-        x.report("read(#{read_count}) write(1) 100K * #{file_count}") do
+        x.report("read(#{read}) write(1) 100K * #{count}") do
           dirs.each do |i|
             dir = File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/'))
             if Dir.exist?(dir)
@@ -143,5 +142,7 @@ end
 
 args = ARGV.map {|arg| arg.split('=')}.to_h
 dest = args['dest'] || './tmp/'
+count = args['count'].try(:to_i) || 1024
+read = args['read'].try(:to_i) || 5
 
-FilesystemBenchmark.new(dest).benchmark
+FilesystemBenchmark.new(dest, count, read).benchmark
