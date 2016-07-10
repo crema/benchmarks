@@ -102,7 +102,7 @@ class FilesystemBenchmark
       puts 'dir'
       Benchmark.bm(32) do |x|
         clear_cache
-        x.report("create #{n} dirs") do
+        x.report("create #{count} dirs") do
           (1..count).to_a.shuffle.each do |i|
             FileUtils.makedirs(File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/')))
           end
@@ -142,7 +142,9 @@ end
 
 args = ARGV.map {|arg| arg.split('=')}.to_h
 dest = args['dest'] || './tmp/'
-count = args['count'].try(:to_i) || 1024
-read = args['read'].try(:to_i) || 5
+count = args['count'].to_i
+read = args['read'].to_i
+count = 1024 if count <= 0
+read = 5 if read <= 0
 
 FilesystemBenchmark.new(dest, count, read).benchmark
