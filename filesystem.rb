@@ -34,7 +34,7 @@ class FilesystemBenchmark
   end
 
   def clear_cache
-    `sudo "bash -c sync; echo 3 > /proc/sys/vm/drop_caches"`
+    `sudo bash -c "sync; echo 3 > /proc/sys/vm/drop_caches"`
   end
 
   def traversal(path)
