@@ -9,6 +9,7 @@ class FilesystemBenchmark
   end
 
   def benchmark
+    clear_cache
     file_benchmark
     dir_benchmark
     mix_benchmark
@@ -30,6 +31,10 @@ class FilesystemBenchmark
 
   def read_file(path)
     `dd if=#{path} of=/dev/null 2>/dev/null`
+  end
+
+  def clear_cache
+    `sudo "bash -c sync; echo 3 > /proc/sys/vm/drop_caches"`
   end
 
   def traversal(path)
@@ -54,22 +59,27 @@ class FilesystemBenchmark
       puts ''
       puts 'file rw'
       results = Benchmark.bm(32) do |x|
+        clear_cache
         x.report('w 1g') do
           write_file(File.join(dest,'tmp.1G'), 1024 * 1024)
         end
+        clear_cache
         x.report('w 1M * 1024') do
           for i in (0..1024) do
             write_file(File.join(dest,"tmp.1M.#{i}"), 1024)
           end
         end
+        clear_cache
         x.report('w 100K * 10240') do
           for i in (0..10240) do
             write_file(File.join(dest,"tmp.100K.#{i}"), 100)
           end
         end
+        clear_cache
         x.report('r 1g') do
           read_file(File.join(dest,'tmp.1G'))
         end
+        clear_cache
         x.report('r 1M * 1024') do
           for i in (0..1024) do
             read_file(File.join(dest,"tmp.1M.#{i}"))
@@ -93,11 +103,13 @@ class FilesystemBenchmark
       puts 'dir'
       n = 1024 * 100
       Benchmark.bm(32) do |x|
+        clear_cache
         x.report("create #{n} dirs") do
           (1..n).to_a.shuffle.each do |i|
             FileUtils.makedirs(File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/')))
           end
         end
+        clear_cache
         x.report('traversal dirs') do
           traversal(File.join(dest,'dirs'))
         end
@@ -114,7 +126,7 @@ class FilesystemBenchmark
       Benchmark.bm(32) do |x|
         dirs = (1..file_count).to_a
         read_count.times {dirs += (1..file_count).to_a}
-
+        clear_cache
         x.report("read(#{read_count}) write(1) 100K * #{file_count}") do
           dirs.each do |i|
             dir = File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/'))
