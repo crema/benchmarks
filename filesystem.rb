@@ -109,13 +109,13 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'mix'
-      file_count = 1024 * 100
+      file_count = 1024 * 10
       read_count = 5
       Benchmark.bm(24) do |x|
         dirs = (1..file_count).to_a
         read_count.times {dirs += (1..file_count).to_a}
 
-        x.report("read(#{read_count}) write(1) #{file_count}") do
+        x.report("read(#{read_count}) write(1) 100K * #{file_count}") do
           dirs.each do |i|
             dir = File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/'))
             if Dir.exist?(dir)
