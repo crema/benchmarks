@@ -112,8 +112,8 @@ class FilesystemBenchmark
       file_count = 1024 * 10
       read_count = 5
       Benchmark.bm(24) do |x|
-        dirs = (1..n).to_a
-        read_count.times {dirs += (1..n).to_a}
+        dirs = (1..file_count).to_a
+        read_count.times {dirs += (1..file_count).to_a}
 
         x.report("read(#{read_count}) write(1) #{file_count}") do
           dirs.each do |i|
