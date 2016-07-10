@@ -1,0 +1,1 @@
+gem 'filesize', :github => 'dominikh/filesize'
