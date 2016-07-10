@@ -98,7 +98,7 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'dir'
-      n = 1024 * 100
+      n = 1024
       Benchmark.bm(32) do |x|
         clear_cache
         x.report("create #{n} dirs") do
@@ -118,7 +118,7 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'mix'
-      file_count = 1024 * 10
+      file_count = 1024
       read_count = 5
       Benchmark.bm(32) do |x|
         dirs = (1..file_count).to_a
