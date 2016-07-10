@@ -43,7 +43,7 @@ class FilesystemBenchmark
         if File.directory?(entry)
           queue << entry
         else
-          yield entry
+          yield entry if block_given?
         end
       end
     end
