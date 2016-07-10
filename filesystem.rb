@@ -21,7 +21,7 @@ class FilesystemBenchmark
   def with_dest_dir
     FileUtils.makedirs(dest)
     yield
-    FileUtils.remove_dir(dest)
+    FileUtils.rm_rf(File.join(dest,'*'))
   end
 
   def write_file(path, size)
@@ -91,7 +91,7 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'dir'
-      n = 1024 * 10
+      n = 1024 * 100
       Benchmark.bm(24) do |x|
         x.report("create #{n} dirs") do
           (1..n).to_a.shuffle.each do |i|
@@ -109,7 +109,7 @@ class FilesystemBenchmark
     with_dest_dir do
       puts ''
       puts 'mix'
-      file_count = 1024 * 10
+      file_count = 1024 * 100
       read_count = 5
       Benchmark.bm(24) do |x|
         dirs = (1..file_count).to_a
