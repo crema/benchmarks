@@ -91,9 +91,6 @@ class FilesystemBenchmark
           end
         end
       end
-      results.each do |result|
-        puts "#{result.label}: #{Filesize.new(1024*1024*1024 / result.real).pretty}/s"
-      end
     end
   end
 
