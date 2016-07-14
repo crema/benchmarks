@@ -64,7 +64,7 @@ class FilesystemBenchmark
       size = total
       count = total / size
 
-      while size >= 1
+      while size >= 10
         clear_cache
         with_dest_dir do
           x.report("w #{Filesize.new(size * 1024).pretty} * #{count}") do
