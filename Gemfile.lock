@@ -1,17 +1,15 @@
-GIT
-  remote: git://github.com/dominikh/filesize.git
-  revision: e9d9e49f9552e37bc265280e793e21a089896331
-  specs:
-    filesize (0.1.1)
-
 GEM
+  remote: https://rubygems.org/
   specs:
+    ffi (1.9.14)
+    filesize (0.1.1)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  filesize!
+  ffi
+  filesize
 
 BUNDLED WITH
-   1.12.3
+   1.12.5

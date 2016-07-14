@@ -1,7 +1,9 @@
 require 'fileutils'
-require 'logger'
 require 'benchmark'
 require 'filesize'
+require_relative 'lib/native_file'
+require_relative 'lib/native_malloc'
+
 
 class FilesystemBenchmark
   def initialize(dest, count, read)
@@ -27,12 +29,25 @@ class FilesystemBenchmark
     FileUtils.rm_rf(File.join(dest,'*'))
   end
 
+  def buffer
+    @buffer ||= NativeMalloc.malloc(1024)
+  end
+
   def write_file(path, size)
-    `dd if=/dev/zero of=#{path} bs=#{1024} count=#{size} 2>/dev/null`
+    file = NativeFile.fopen(path,'wb')
+    size.times do
+      NativeFile.fwrite(buffer,1,1024,file)
+    end
+    NativeFile.fclose(file)
   end
 
   def read_file(path)
-    `dd if=#{path} of=/dev/null 2>/dev/null`
+    file = NativeFile.fopen(path,'rb')
+    loop do
+      read_size = NativeFile.fread(buffer,1,1024,file)
+      break if read_size < 1024
+    end
+    NativeFile.fclose(file)
   end
 
   def clear_cache
@@ -134,6 +149,6 @@ dest = args['dest'] || './tmp/'
 count = args['count'].to_i
 read = args['read'].to_i
 count = 1024 if count <= 0
-read = 5 if read <= 0
+read = 10 if read <= 0
 
 FilesystemBenchmark.new(dest, count, read).benchmark

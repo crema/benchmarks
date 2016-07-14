@@ -1,1 +1,4 @@
-gem 'filesize', :github => 'dominikh/filesize'
+source 'https://rubygems.org'
+
+gem 'ffi'
+gem 'filesize'
