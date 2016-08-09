@@ -81,7 +81,7 @@ class FilesystemBenchmark
   def file_benchmark
     puts ''
     puts 'file rw'
-    results = Benchmark.bm(32) do |x|
+    results = Benchmark.bm(40) do |x|
       total = 1024 * file
       size = total
       count = total / size
@@ -110,7 +110,7 @@ class FilesystemBenchmark
   def dir_benchmark
     puts ''
     puts 'dir'
-    Benchmark.bm(32) do |x|
+    Benchmark.bm(40) do |x|
       with_dest_dir do
         clear_cache
         x.report("create #{dir} dirs") do
@@ -129,10 +129,10 @@ class FilesystemBenchmark
   def mix_benchmark
     puts ''
     puts 'mix'
-    Benchmark.bm(32) do |x|
+    Benchmark.bm(40) do |x|
       with_dest_dir do
         clear_cache       
-        x.report("read(#{read}) write(1) 100K * #{mix}") do
+        x.report("read(#{read}) write(1) 100K * #{mix} thread=#{thread}") do
           dirs = (1..mix).to_a
           read.times {dirs += (1..mix).to_a}
           dirs.shuffle!
