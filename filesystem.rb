@@ -6,22 +6,25 @@ require_relative 'lib/native_malloc'
 
 
 class FilesystemBenchmark
-  def initialize(dest, count, read)
-    @dest = dest
-    @count = count
-    @read = read
+  def initialize(args)
+    @dest = args['dest'] || './tmp/'
+
+    @file = args['file'].to_i
+    @dir = args['dir'].to_i
+    @mix = args['mix'].to_i
+    @read = args['read'].to_i
   end
 
   def benchmark
     clear_cache
-    file_benchmark
-    dir_benchmark
-    mix_benchmark
+    file_benchmark if file > 0
+    dir_benchmark if dir > 0
+    mix_benchmark if mix > 0
   end
 
   private
 
-  attr_reader :dest, :count, :read
+  attr_reader :dest, :file, :dir, :mix, :read
 
   def with_dest_dir
     FileUtils.makedirs(dest)
@@ -75,7 +78,7 @@ class FilesystemBenchmark
     puts ''
     puts 'file rw'
     results = Benchmark.bm(32) do |x|
-      total = 1024 * count
+      total = 1024 * file
       size = total
       count = total / size
 
@@ -106,8 +109,8 @@ class FilesystemBenchmark
     Benchmark.bm(32) do |x|
       with_dest_dir do
         clear_cache
-        x.report("create #{count} dirs") do
-          (1..count).to_a.shuffle.each do |i|
+        x.report("create #{dir} dirs") do
+          (1..dir).to_a.shuffle.each do |i|
             FileUtils.makedirs(File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/')))
           end
         end
@@ -123,14 +126,14 @@ class FilesystemBenchmark
     puts ''
     puts 'mix'
     Benchmark.bm(32) do |x|
-      dirs = (1..count).to_a
-      read.times {dirs += (1..count).to_a}
+      dirs = (1..mix).to_a
+      read.times {dirs += (1..mix).to_a}
       with_dest_dir do
         clear_cache
-        x.report("read(#{read}) write(1) 100K * #{count}") do
+        x.report("read(#{read}) write(1) 100K * #{mix}") do
           dirs.each do |i|
             dir = File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/'))
-            if Dir.exist?(dir)
+            unless Dir.exist?(dir)
               FileUtils.makedirs(dir)
               write_file(File.join(dir,'tmp'), 100)
             else
@@ -145,10 +148,5 @@ end
 
 
 args = ARGV.map {|arg| arg.split('=')}.to_h
-dest = args['dest'] || './tmp/'
-count = args['count'].to_i
-read = args['read'].to_i
-count = 1024 if count <= 0
-read = 10 if read <= 0
 
-FilesystemBenchmark.new(dest, count, read).benchmark
+FilesystemBenchmark.new(args).benchmark
