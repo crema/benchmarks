@@ -1,6 +1,7 @@
 require 'fileutils'
 require 'benchmark'
 require 'filesize'
+require 'parallel'
 require_relative 'lib/native_file'
 require_relative 'lib/native_malloc'
 
@@ -13,6 +14,9 @@ class FilesystemBenchmark
     @dir = args['dir'].to_i
     @mix = args['mix'].to_i
     @read = args['read'].to_i
+    @thread = args['thread'].to_i
+
+    @thread = 1 if @thread <= 0
   end
 
   def benchmark
@@ -24,7 +28,7 @@ class FilesystemBenchmark
 
   private
 
-  attr_reader :dest, :file, :dir, :mix, :read
+  attr_reader :dest, :file, :dir, :mix, :read, :thread
 
   def with_dest_dir
     FileUtils.makedirs(dest)
@@ -126,18 +130,24 @@ class FilesystemBenchmark
     puts ''
     puts 'mix'
     Benchmark.bm(32) do |x|
-      dirs = (1..mix).to_a
-      read.times {dirs += (1..mix).to_a}
       with_dest_dir do
-        clear_cache
+        clear_cache       
         x.report("read(#{read}) write(1) 100K * #{mix}") do
-          dirs.each do |i|
-            dir = File.join(dest,'dirs',format('%010d', i).scan(/.{2}/).join('/'))
-            unless Dir.exist?(dir)
-              FileUtils.makedirs(dir)
-              write_file(File.join(dir,'tmp'), 100)
+          dirs = (1..mix).to_a
+          read.times {dirs += (1..mix).to_a}
+          dirs.shuffle!
+
+          Parallel.each(dirs, in_thread: thread) do |dir|
+            dir = File.join(dest,'dirs',format('%010d', dir).scan(/.{2}/).join('/'))
+            if Dir.exist?(dir)
+              filename = File.join(dir,'tmp')
+              if File.exist?(filename)
+                read_file(filename)
+              else
+                write_file(filename, 100)
+              end
             else
-              read_file(File.join(dir,'tmp'))
+              FileUtils.makedirs(dir)
             end
           end
         end

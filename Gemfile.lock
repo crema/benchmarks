@@ -3,6 +3,7 @@ GEM
   specs:
     ffi (1.9.14)
     filesize (0.1.1)
+    parallel (1.8.0)
 
 PLATFORMS
   ruby
@@ -10,6 +11,7 @@ PLATFORMS
 DEPENDENCIES
   ffi
   filesize
+  parallel
 
 BUNDLED WITH
    1.12.5
