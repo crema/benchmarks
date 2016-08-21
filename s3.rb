@@ -64,7 +64,6 @@ class S3Benchmark
   end
 
   def with_bucket
-    retry_count = 0
     begin
       unless (resp = s3.list_objects(bucket: bucket)).contents.empty?
         resp.contents.each do |content|
@@ -72,10 +71,11 @@ class S3Benchmark
         end
       end
       s3.delete_bucket(bucket: bucket)
-    ensure
-      s3.create_bucket(acl: "private", bucket: bucket,
-                       create_bucket_configuration: { location_constraint: "ap-northeast-2"})
+    rescue Aws::S3::Errors::NoSuchBucket => e
     end
+
+    s3.create_bucket(acl: "private", bucket: bucket,
+                     create_bucket_configuration: { location_constraint: "ap-northeast-2"})
 
     yield if block_given?
 
