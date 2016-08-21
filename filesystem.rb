@@ -2,6 +2,7 @@ require 'fileutils'
 require 'benchmark'
 require 'filesize'
 require 'parallel'
+require 'concurrent'
 require_relative 'lib/native_file'
 require_relative 'lib/native_malloc'
 
@@ -16,7 +17,16 @@ class FilesystemBenchmark
     @read = args['read'].to_i
     @thread = args['thread'].to_i
 
+    @mix_size = args.fetch('mix_size', 100).to_i
+
     @thread = 1 if @thread <= 0
+
+    @put_count = Concurrent::AtomicFixnum.new
+    @put_time = Concurrent::AtomicFixnum.new
+    @get_count = Concurrent::AtomicFixnum.new
+    @get_time = Concurrent::AtomicFixnum.new
+    @head_count = Concurrent::AtomicFixnum.new
+    @head_time = Concurrent::AtomicFixnum.new
   end
 
   def benchmark
@@ -28,9 +38,11 @@ class FilesystemBenchmark
 
   private
 
-  attr_reader :dest, :file, :dir, :mix, :read, :thread
+  attr_reader :dest, :file, :dir, :mix, :read, :thread, :mix_size,
+              :get_count, :get_time, :put_count, :put_time, :head_count, :head_time
 
   def with_dest_dir
+    FileUtils.rm_rf(dest)
     FileUtils.makedirs(dest)
     yield
     FileUtils.rm_rf(File.join(dest,'*'))
@@ -126,6 +138,37 @@ class FilesystemBenchmark
     end
   end
 
+
+  def head(filename)
+    result = false
+    elapsed = Benchmark.realtime do
+      result = Dir.exist?(File.dirname(filename))
+    end
+
+    head_count.increment
+    head_time.increment((elapsed*1000000).round)
+    result
+  end
+
+  def get(filename)
+    elapsed = Benchmark.realtime do
+      read_file(filename)
+    end
+
+    get_count.increment
+    get_time.increment((elapsed*1000000).round)
+  end
+
+  def put(filename)
+    elapsed = Benchmark.realtime do
+      dir = File.dirname(filename)
+      FileUtils.makedirs(dir) unless Dir.exist?(dir)
+      write_file(filename, mix_size)
+    end
+    put_count.increment
+    put_time.increment((elapsed*1000000).round)
+  end
+
   def mix_benchmark
     puts ''
     puts 'mix'
@@ -137,22 +180,23 @@ class FilesystemBenchmark
           read.times {dirs += (1..mix).to_a}
           dirs.shuffle!
 
-          Parallel.each(dirs, in_thread: thread) do |dir|
+          Parallel.each(dirs, in_threads: thread) do |dir|
             dir = File.join(dest,'dirs',format('%010d', dir).scan(/.{2}/).join('/'))
-            if Dir.exist?(dir)
-              filename = File.join(dir,'tmp')
-              if File.exist?(filename)
-                read_file(filename)
-              else
-                write_file(filename, 100)
-              end
+            filename = File.join(dir,'tmp')
+
+            if head(filename)
+              get(filename)
             else
-              FileUtils.makedirs(dir)
+              put(filename)
             end
           end
         end
       end
     end
+
+    puts("head count: #{head_count.value}, time: #{head_time.value / 1000000.0}, average #{1000000.0 * head_count.value / head_time.value }")
+    puts("get count: #{get_count.value}, time: #{get_time.value / 1000000.0}, average #{1000000.0 * get_count.value / get_time.value}")
+    puts("put count: #{put_count.value}, time: #{put_time.value / 1000000.0}, average #{1000000.0 * put_count.value / put_time.value}")
   end
 end
 
