@@ -70,21 +70,19 @@ class S3Benchmark
           s3.delete_object(bucket:bucket, key: content.key)
         end
       end
-      s3.delete_bucket(bucket: bucket)
     rescue Aws::S3::Errors::NoSuchBucket => e
     end
 
-    s3.create_bucket(acl: "private", bucket: bucket,
-                     create_bucket_configuration: { location_constraint: "ap-northeast-2"})
-
     yield if block_given?
 
-    unless (resp = s3.list_objects(bucket: bucket)).contents.empty?
-      resp.contents.each do |content|
-        s3.delete_object(bucket:bucket, key: content.key)
+    begin
+      unless (resp = s3.list_objects(bucket: bucket)).contents.empty?
+        resp.contents.each do |content|
+          s3.delete_object(bucket:bucket, key: content.key)
+        end
       end
+    rescue Aws::S3::Errors::NoSuchBucket => e
     end
-    s3.delete_bucket(bucket: bucket)
   end
 
   def create_tmpfile
