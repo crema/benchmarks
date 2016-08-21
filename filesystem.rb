@@ -167,7 +167,7 @@ class FilesystemBenchmark
           read.times {dirs += (1..mix).to_a}
           dirs.shuffle!
 
-          results = Parallel.map(dirs, in_threads: thread) do |dir|
+          results = Parallel.map(dirs, in_processes: thread) do |dir|
             dir = File.join(dest,'dirs',format('%010d', dir).scan(/.{2}/).join('/'))
             key = File.join(dir,'tmp')
 

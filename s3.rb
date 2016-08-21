@@ -91,7 +91,7 @@ class S3Benchmark
         read.times {keys += (1..count).to_a}
         keys.shuffle!
 
-        results = Parallel.map(keys, in_threads: thread) do |key|
+        results = Parallel.map(keys, in_processes: thread) do |key|
           dir = format('%010d', key).scan(/.{2}/).join('/')
           key = File.join(dir,'tmp')
 
