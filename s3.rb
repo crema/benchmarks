@@ -20,14 +20,6 @@ class S3Benchmark
     @tmp = args.fetch('tmp','/tmp')
 
     @s3 = Aws::S3::Client.new(region: region, credentials: Aws::Credentials.new(id, secret))
-
-
-    @put_count = Concurrent::AtomicFixnum.new
-    @put_time = Concurrent::AtomicFixnum.new
-    @get_count = Concurrent::AtomicFixnum.new
-    @get_time = Concurrent::AtomicFixnum.new
-    @head_count = Concurrent::AtomicFixnum.new
-    @head_time = Concurrent::AtomicFixnum.new
   end
 
   def benchmark
@@ -38,8 +30,7 @@ class S3Benchmark
 
   private
 
-  attr_reader :thread, :count, :read, :size, :tmp, :s3, :bucket,
-              :get_count, :get_time, :put_count, :put_time, :head_count, :head_time
+  attr_reader :thread, :count, :read, :size, :tmp, :s3, :bucket
 
   def try_realtime
     result = true
@@ -54,32 +45,23 @@ class S3Benchmark
   end
 
   def head(key)
-    result, elapsed = try_realtime do
+    try_realtime do
       s3.head_object(bucket: bucket, key: key)
     end
-
-    head_count.increment
-    head_time.increment((elapsed * 1000000).round)
-    result
   end
 
   def get(key)
-    result, elapsed =  try_realtime do
+    try_realtime do
       s3.get_object(bucket: bucket, key: key)
     end
-
-    get_count.increment
-    get_time.increment((elapsed * 1000000).round)
   end
 
   def put(key)
-    result, elapsed =  try_realtime do
+    try_realtime do
       File.open(File.join(tmp, 's3tmp'), 'rb') do |file|
         s3.put_object(bucket: bucket, key: key, body: file)
       end
     end
-    put_count.increment
-    put_time.increment((elapsed * 1000000).round)
   end
 
   def create_bucket
@@ -102,27 +84,55 @@ class S3Benchmark
   end
 
   def s3_benchmark
+    results = []
     Benchmark.bm(40) do |x|
       x.report("read(#{read}) write(1) #{size}K * #{count} thread=#{thread}") do
         keys = (1..count).to_a
         read.times {keys += (1..count).to_a}
         keys.shuffle!
 
-        Parallel.each(keys, in_threads: thread) do |key|
+        results = Parallel.map(keys, in_threads: thread) do |key|
           dir = format('%010d', key).scan(/.{2}/).join('/')
           key = File.join(dir,'tmp')
-          if head(key)
-            get(key)
+
+          result = []
+          head_result, head_elapsed = head(key)
+
+          result << [:head, head_elapsed]
+          if head_result
+            get_result, get_elapsed = get(key)
+            result << [:get, get_elapsed]
           else
-            put(key)
+            put_result, put_elapsed = put(key)
+            result << [:put, put_elapsed]
           end
+          result
         end
       end
     end
 
-    puts("head count: #{head_count.value}, time: #{head_time.value / 1000000.0}, average #{1000000.0 * head_count.value / head_time.value }")
-    puts("get count: #{get_count.value}, time: #{get_time.value / 1000000.0}, average #{1000000.0 * get_count.value / get_time.value}")
-    puts("put count: #{put_count.value}, time: #{put_time.value / 1000000.0}, average #{1000000.0 * put_count.value / put_time.value}")
+    results.flatten!(1)
+
+    head_count = get_count = put_count = 0
+    head_time = get_time = put_time = 0
+
+    results.each do |result|
+      case result.first
+        when :head
+          head_count += 1
+          head_time += result.last
+        when :get
+          get_count += 1
+          get_time += result.last
+        when :put
+          put_count += 1
+          put_time += result.last
+      end
+    end
+
+    puts("head count: #{head_count}, time: #{head_time}, average #{head_count / head_time}")
+    puts("get count: #{get_count}, time: #{get_time}, average #{get_count / get_time}")
+    puts("put count: #{put_count}, time: #{put_time}, average #{put_count / put_time}")
   end
 end
 

@@ -20,13 +20,6 @@ class FilesystemBenchmark
     @mix_size = args.fetch('mix_size', 100).to_i
 
     @thread = 1 if @thread <= 0
-
-    @put_count = Concurrent::AtomicFixnum.new
-    @put_time = Concurrent::AtomicFixnum.new
-    @get_count = Concurrent::AtomicFixnum.new
-    @get_time = Concurrent::AtomicFixnum.new
-    @head_count = Concurrent::AtomicFixnum.new
-    @head_time = Concurrent::AtomicFixnum.new
   end
 
   def benchmark
@@ -38,8 +31,7 @@ class FilesystemBenchmark
 
   private
 
-  attr_reader :dest, :file, :dir, :mix, :read, :thread, :mix_size,
-              :get_count, :get_time, :put_count, :put_time, :head_count, :head_time
+  attr_reader :dest, :file, :dir, :mix, :read, :thread, :mix_size
 
   def with_dest_dir
     FileUtils.rm_rf(dest)
@@ -144,19 +136,14 @@ class FilesystemBenchmark
     elapsed = Benchmark.realtime do
       result = Dir.exist?(File.dirname(filename))
     end
-
-    head_count.increment
-    head_time.increment((elapsed*1000000).round)
-    result
+    [result, elapsed]
   end
 
   def get(filename)
     elapsed = Benchmark.realtime do
       read_file(filename)
     end
-
-    get_count.increment
-    get_time.increment((elapsed*1000000).round)
+    [true, elapsed]
   end
 
   def put(filename)
@@ -165,13 +152,13 @@ class FilesystemBenchmark
       FileUtils.makedirs(dir) unless Dir.exist?(dir)
       write_file(filename, mix_size)
     end
-    put_count.increment
-    put_time.increment((elapsed*1000000).round)
+    [true, elapsed]
   end
 
   def mix_benchmark
     puts ''
     puts 'mix'
+    results = []
     Benchmark.bm(40) do |x|
       with_dest_dir do
         clear_cache       
@@ -180,23 +167,49 @@ class FilesystemBenchmark
           read.times {dirs += (1..mix).to_a}
           dirs.shuffle!
 
-          Parallel.each(dirs, in_threads: thread) do |dir|
+          results = Parallel.map(dirs, in_threads: thread) do |dir|
             dir = File.join(dest,'dirs',format('%010d', dir).scan(/.{2}/).join('/'))
-            filename = File.join(dir,'tmp')
+            key = File.join(dir,'tmp')
 
-            if head(filename)
-              get(filename)
+            result = []
+            head_result, head_elapsed = head(key)
+
+            result << [:head, head_elapsed]
+            if head_result
+              get_result, get_elapsed = get(key)
+              result << [:get, get_elapsed]
             else
-              put(filename)
+              put_result, put_elapsed = put(key)
+              result << [:put, put_elapsed]
             end
+            result
           end
         end
       end
     end
 
-    puts("head count: #{head_count.value}, time: #{head_time.value / 1000000.0}, average #{1000000.0 * head_count.value / head_time.value }")
-    puts("get count: #{get_count.value}, time: #{get_time.value / 1000000.0}, average #{1000000.0 * get_count.value / get_time.value}")
-    puts("put count: #{put_count.value}, time: #{put_time.value / 1000000.0}, average #{1000000.0 * put_count.value / put_time.value}")
+    results.flatten!(1)
+
+    head_count = get_count = put_count = 0
+    head_time = get_time = put_time = 0
+
+    results.each do |result|
+      case result.first
+        when :head
+          head_count += 1
+          head_time += result.last
+        when :get
+          get_count += 1
+          get_time += result.last
+        when :put
+          put_count += 1
+          put_time += result.last
+      end
+    end
+
+    puts("head count: #{head_count}, time: #{head_time}, average #{head_count / head_time}")
+    puts("get count: #{get_count}, time: #{get_time}, average #{get_count / get_time}")
+    puts("put count: #{put_count}, time: #{put_time}, average #{put_count / put_time}")
   end
 end
 
