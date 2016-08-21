@@ -65,12 +65,20 @@ class S3Benchmark
   end
 
   def create_bucket
+    retry_count = 0
     begin
       resp = s3.list_objects(bucket: bucket)
       resp.contents.each do |content|
         s3.delete_object(bucket:bucket, key: content.key)
       end
       s3.delete_bucket(bucket: bucket)
+    rescue StandardError => e
+      retry_count += 1
+      if retry_count > 5
+        raise e
+      else
+        retry
+      end
     ensure
       s3.create_bucket(acl: "private", bucket: bucket,
                        create_bucket_configuration: { location_constraint: "ap-northeast-2"})
