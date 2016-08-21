@@ -24,7 +24,6 @@ class S3Benchmark
 
   def benchmark
     create_tmpfile
-    create_bucket
     s3_benchmark
   end
 
@@ -64,25 +63,28 @@ class S3Benchmark
     end
   end
 
-  def create_bucket
+  def with_bucket
     retry_count = 0
     begin
-      resp = s3.list_objects(bucket: bucket)
-      resp.contents.each do |content|
-        s3.delete_object(bucket:bucket, key: content.key)
+      unless (resp = s3.list_objects(bucket: bucket)).contents.empty?
+        resp.contents.each do |content|
+          s3.delete_object(bucket:bucket, key: content.key)
+        end
       end
       s3.delete_bucket(bucket: bucket)
-    rescue StandardError => e
-      retry_count += 1
-      if retry_count > 5
-        raise e
-      else
-        retry
-      end
     ensure
       s3.create_bucket(acl: "private", bucket: bucket,
                        create_bucket_configuration: { location_constraint: "ap-northeast-2"})
     end
+
+    yield if block_given?
+
+    unless (resp = s3.list_objects(bucket: bucket)).contents.empty?
+      resp.contents.each do |content|
+        s3.delete_object(bucket:bucket, key: content.key)
+      end
+    end
+    s3.delete_bucket(bucket: bucket)
   end
 
   def create_tmpfile
@@ -93,54 +95,57 @@ class S3Benchmark
 
   def s3_benchmark
     results = []
-    Benchmark.bm(40) do |x|
-      x.report("read(#{read}) write(1) #{size}K * #{count} thread=#{thread}") do
-        keys = (1..count).to_a
-        read.times {keys += (1..count).to_a}
-        keys.shuffle!
+    with_bucket do
 
-        results = Parallel.map(keys, in_processes: thread) do |key|
-          dir = format('%010d', key).scan(/.{2}/).join('/')
-          key = File.join(dir,'tmp')
+      Benchmark.bm(40) do |x|
+        x.report("read(#{read}) write(1) #{size}K * #{count} thread=#{thread}") do
+          keys = (1..count).to_a
+          read.times {keys += (1..count).to_a}
+          keys.shuffle!
 
-          result = []
-          head_result, head_elapsed = head(key)
+          results = Parallel.map(keys, in_processes: thread) do |key|
+            dir = format('%010d', key).scan(/.{2}/).join('/')
+            key = File.join(dir,'tmp')
 
-          result << [:head, head_elapsed]
-          if head_result
-            get_result, get_elapsed = get(key)
-            result << [:get, get_elapsed]
-          else
-            put_result, put_elapsed = put(key)
-            result << [:put, put_elapsed]
+            result = []
+            head_result, head_elapsed = head(key)
+
+            result << [:head, head_elapsed]
+            if head_result
+              get_result, get_elapsed = get(key)
+              result << [:get, get_elapsed]
+            else
+              put_result, put_elapsed = put(key)
+              result << [:put, put_elapsed]
+            end
+            result
           end
-          result
         end
       end
-    end
 
-    results.flatten!(1)
+      results.flatten!(1)
 
-    head_count = get_count = put_count = 0
-    head_time = get_time = put_time = 0
+      head_count = get_count = put_count = 0
+      head_time = get_time = put_time = 0
 
-    results.each do |result|
-      case result.first
-        when :head
-          head_count += 1
-          head_time += result.last
-        when :get
-          get_count += 1
-          get_time += result.last
-        when :put
-          put_count += 1
-          put_time += result.last
+      results.each do |result|
+        case result.first
+          when :head
+            head_count += 1
+            head_time += result.last
+          when :get
+            get_count += 1
+            get_time += result.last
+          when :put
+            put_count += 1
+            put_time += result.last
+        end
       end
-    end
 
-    puts("head count: #{head_count}, time: #{head_time}, average #{head_count / head_time}")
-    puts("get count: #{get_count}, time: #{get_time}, average #{get_count / get_time}")
-    puts("put count: #{put_count}, time: #{put_time}, average #{put_count / put_time}")
+      puts("head count: #{head_count}, time: #{head_time}, average #{head_count / head_time}")
+      puts("get count: #{get_count}, time: #{get_time}, average #{get_count / get_time}")
+      puts("put count: #{put_count}, time: #{put_time}, average #{put_count / put_time}")
+    end
   end
 end
 
